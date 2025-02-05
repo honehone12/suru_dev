@@ -5,16 +5,11 @@ pub struct Month {
     pub year: String,
     pub month: String,
     pub url: String,
+    pub days: Vec<Day>
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Day {
-    day: String,
-    pages: Vec<Page>
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Page {
-    page: String,
-    url: String
+    pub day: String,
+    pub root_url: String
 }

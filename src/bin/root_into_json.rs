@@ -2,7 +2,6 @@ use std::env;
 use anyhow::bail;
 use tokio::fs;
 use scraper::{Html, Selector};
-use tracing::warn;
 use suru_dev::Month;
 
 const SOURCE: &'static str = "html/root.html";
@@ -10,24 +9,25 @@ const DEST: &'static str = "json/root.json";
 
 fn into_month(url: String) -> anyhow::Result<Month> {
     let Some((_, ym)) = url.rsplit_once("/") else {
-        bail!("could not split with '/'");
+        bail!("could not split with '/': {url}");
     };
 
     let Some((y, m)) = ym.split_at_checked(4) else {
-        bail!("could not split at 4");
+        bail!("could not split at 4: {url}");
     };
 
     if y.len() != 4 {
-        bail!("unexpected year length");
+        bail!("unexpected year length: {url}");
     }
     if m.len() != 2 {
-        bail!("unexpected month length");
+        bail!("unexpected month length: {url}");
     }
 
     let month = Month{
         year: y.to_string(),
         month: m.to_string(),
-        url
+        url,
+        days: vec![]
     };
     Ok(month)
 }
@@ -60,7 +60,6 @@ async fn scrape(document: String) -> anyhow::Result<Vec<Month>> {
             for data in row.select(&data_tag) {
                 for a in data.select(&a_tag) {
                     let Some(href) =  a.attr("href") else {
-                        warn!("skipping element without link");
                         continue;
                     };
 
