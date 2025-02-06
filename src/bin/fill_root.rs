@@ -1,33 +1,17 @@
 use std::{time::{Duration, Instant}, env};
 use anyhow::bail;
 use tokio::{fs, time::sleep};
-use suru_dev::{Day, Month};
+use suru_dev::{DailyRoot, MonthlyRoot};
 use tracing::info;
 use scraper::{Html, Selector};
 use reqwest::Client as HttpClient;
 
 const SOURCE: &'static str = "json/root.json";
 
-fn into_day(url: String) -> anyhow::Result<Day> {
-    let Some((_, ymd_p)) = url.rsplit_once("/") else {
-        bail!("failed to split with '/': {url}");
-    };
-
-    let Some(d) = ymd_p.get(6..=7) else {
-        bail!("failed to get range 6..=7: {url}");
-    };
-
-    let day = Day{
-        day: d.to_string(),
-        root_url: url
-    };
-    Ok(day)
-}
-
-async fn scrape(
+async fn fill_root(
     client: &HttpClient, 
     a_tag: &Selector, 
-    month: &mut Month,
+    month: &mut MonthlyRoot,
     root: &str
 ) -> anyhow::Result<()> {
     info!("requesting {}/{}", month.year, month.month);
@@ -45,11 +29,11 @@ async fn scrape(
         }
 
         let url = format!("{root}/{href}");
-        let day = into_day(url)?;
-        if month.days.iter().find(|d| d.day == day.day).is_some() {
+        let day = DailyRoot::from_url(url)?;
+        if month.products.iter().find(|d| d.day == day.day).is_some() {
             continue;
         }
-        month.days.push(day);
+        month.products.push(day);
     }
 
     Ok(())
@@ -64,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
 
     let s = fs::read_to_string(SOURCE).await?;
     fs::write(format!("{SOURCE}.bu"), &s).await?;
-    let mut list = serde_json::from_str::<Vec<Month>>(&s)?;
+    let mut list = serde_json::from_str::<Vec<MonthlyRoot>>(&s)?;
     let root = env::var("URL_ROOT")?;
 
     let a_tag = match Selector::parse("a") {
@@ -80,7 +64,7 @@ async fn main() -> anyhow::Result<()> {
             continue;
         }
 
-        scrape(&client, &a_tag, month, &root).await?;
+        fill_root(&client, &a_tag, month, &root).await?;
 
         sleep(interval).await;
     }

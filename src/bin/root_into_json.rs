@@ -2,37 +2,12 @@ use std::env;
 use anyhow::bail;
 use tokio::fs;
 use scraper::{Html, Selector};
-use suru_dev::Month;
+use suru_dev::MonthlyRoot;
 
 const SOURCE: &'static str = "html/root.html";
 const DEST: &'static str = "json/root.json";
 
-fn into_month(url: String) -> anyhow::Result<Month> {
-    let Some((_, ym)) = url.rsplit_once("/") else {
-        bail!("could not split with '/': {url}");
-    };
-
-    let Some((y, m)) = ym.split_at_checked(4) else {
-        bail!("could not split at 4: {url}");
-    };
-
-    if y.len() != 4 {
-        bail!("unexpected year length: {url}");
-    }
-    if m.len() != 2 {
-        bail!("unexpected month length: {url}");
-    }
-
-    let month = Month{
-        year: y.to_string(),
-        month: m.to_string(),
-        url,
-        days: vec![]
-    };
-    Ok(month)
-}
-
-async fn scrape(document: String) -> anyhow::Result<Vec<Month>> {
+async fn scrape_root(document: String) -> anyhow::Result<Vec<MonthlyRoot>> {
     let doc = Html::parse_document(&document);
     
     let table_tag = match Selector::parse("table") {
@@ -68,7 +43,7 @@ async fn scrape(document: String) -> anyhow::Result<Vec<Month>> {
                         url.pop();
                     }
 
-                    let month = into_month(url)?;
+                    let month = MonthlyRoot::from_url(url)?;
                     list.push(month);
                 }
             }
@@ -84,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv()?;
 
     let document = fs::read_to_string(SOURCE).await?;
-    let list = scrape(document).await?;    
+    let list = scrape_root(document).await?;    
     let json = serde_json::to_string_pretty(&list)?;
     fs::write(DEST, json).await?;
 
